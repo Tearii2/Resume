@@ -1,0 +1,305 @@
+<!--Hunter Matheny
+Section 1
+4/23/2025-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Testcrawler Quest</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f0f0f0;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    h1 {
+      margin: 20px;
+    }
+    #gameInfo {
+      margin: 10px;
+    }
+    #grid {
+      display: grid;
+      grid-template-columns: repeat(5, 60px);
+      gap: 5px;
+      margin: 20px;
+    }
+    .tile {
+        width: 60px;
+        height: 52px; /* shorter to match horizontal hex proportions */
+        background: #ccc;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 10px;
+        cursor: pointer;
+        text-align: center;
+        position: relative;
+        clip-path: polygon(
+            25% 0%, 75% 0%,
+            100% 50%, 75% 100%,
+            25% 100%, 0% 50%
+        );
+        margin: 1px;
+    }
+    .player {
+      background: gold;
+    }
+    .revealed {
+      background: #ddd;
+    }
+    .mountain { 
+        background-color: #a9a9a9; 
+        background-image: url(../assets/img/Hexploration/Mountain.png);
+        background-size: 650%;
+        background-position: center;
+    }
+    .forest { 
+        background-color: #228B22; 
+        background-image: url(../assets/img/Hexploration/Forest.png);
+        background-size: 650% ;
+        background-position: center;
+    }
+    .desert { 
+        background-color: #C19A6B; 
+        background-image: url(../assets/img/Hexploration/Desert.png);
+        background-size: 650%;
+        background-position: center;
+    }
+    .plains { 
+        background-color: #9acd32; 
+        background-image: url(../assets/img/Hexploration/Plains.png);
+        background-size: 650%;
+        background-position: center;
+    }
+    .ruins { 
+        background-color: #cd853f; 
+        background-image: url(../assets/img/Hexploration/Ruins.png);
+        background-size: 650%;
+        background-position: center;
+    }
+    #log {
+      max-height: 100px;
+      overflow-y: auto;
+      width: 300px;
+      background: white;
+      border: 1px solid #aaa;
+      padding: 5px;
+      font-size: 12px;
+    }
+    #endScreen {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      justify-content: center;
+      align-items: center;
+      font-size: 24px;
+      flex-direction: column;
+    }
+    button {
+      margin-top: 10px;
+      padding: 8px 12px;
+      font-size: 16px;
+    }
+    .tile .label {
+        color: transparent;
+        transition: color 0.3s;
+        font-weight: bold;
+        pointer-events: none; /* Makes sure the hover is on the tile, not the text */
+    }
+
+    .tile:hover .label {
+        color: white;
+        text-shadow: 1px 1px 2px black;
+    }
+    .top-link {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        text-decoration: none;
+        background: rgba(0, 0, 0, 0.6);
+        color: white;
+        padding: 6px 10px;
+        border-radius: 5px;
+        font-size: 14px;
+        z-index: 10;
+        /* transition: background 0.3s; */
+    }
+
+    .top-link:hover {
+        background: rgba(0, 0, 0, 0.8);
+    }
+
+
+
+
+  </style>
+</head>
+<body>
+    <a href="Fromstratch.html" class="top-link">←</a>
+
+  <h1>Hexcrawler Quest</h1>
+  <div id="gameInfo">
+    Health: <span id="health">5</span> | Turns Left: <span id="turns">20</span>
+  </div>
+  <div id="grid"></div>
+  <div id="log"></div>
+  <div id="endScreen">
+    <div id="endMessage"></div>
+    <button onclick="initGame()">Restart</button>
+  </div>
+
+  <script>
+    const gridSize = 5;
+    let grid = [];
+    let player = { x: 2, y: 2, health: 5, turns: 20 };
+    let artifactPosition = {};
+    const terrainTypes = ['plains', 'forest', 'mountain', 'desert', 'ruins'];
+
+    function log(msg) {
+      const logBox = document.getElementById('log');
+      logBox.innerHTML += `<div>${msg}</div>`;
+      logBox.scrollTop = logBox.scrollHeight;
+    }
+
+    function randomTerrain() {
+      return terrainTypes[Math.floor(Math.random() * terrainTypes.length)];
+    }
+
+    function placeArtifact() {
+      while (true) {
+        let x = Math.floor(Math.random() * gridSize);
+        let y = Math.floor(Math.random() * gridSize);
+        if (!(x === player.x && y === player.y)) {
+          let terrain = grid[y][x].terrain;
+          grid[y][x].artifact = true;
+          artifactPosition = { x, y };
+          break;
+        }
+      }
+    }
+
+    function createGrid() {
+      grid = [];
+      for (let y = 0; y < gridSize; y++) {
+        const row = [];
+        for (let x = 0; x < gridSize; x++) {
+          row.push({
+            revealed: false,
+            terrain: randomTerrain(),
+            artifact: false,
+            clue: Math.random() < 0.1,
+          });
+        }
+        grid.push(row);
+      }
+    }
+
+    function revealAround(x, y) {
+      const dirs = [
+        [0, 0], [1, 0], [-1, 0], [0, 1], [0, -1],
+        [1, 1], [-1, -1], [1, -1], [-1, 1]
+      ];
+      for (const [dx, dy] of dirs) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (nx >= 0 && ny >= 0 && nx < gridSize && ny < gridSize) {
+          grid[ny][nx].revealed = true;
+        }
+      }
+    }
+
+    function moveTo(x, y) {
+      if (Math.abs(x - player.x) > 1 || Math.abs(y - player.y) > 1) return;
+      player.x = x;
+      player.y = y;
+      player.turns--;
+
+      const tile = grid[y][x];
+      revealAround(x, y);
+
+      // Terrain effects
+      switch (tile.terrain) {
+        case 'desert': player.health--; log("The desert saps your strength."); break;
+        case 'mountain': player.turns--; log("Climbing the mountain takes longer."); break;
+        case 'forest':
+          if (Math.random() < 0.3) {
+            player.health--;
+            log("You are ambushed in the forest!");
+          }
+          break;
+      }
+
+      if (tile.clue) {
+        log("A wandering druid hints the artifact is near the " + grid[artifactPosition.y][artifactPosition.x].terrain + ".");
+      }
+
+      if (tile.artifact) {
+        endGame(true);
+        return;
+      }
+
+      if (player.health <= 0 || player.turns <= 0) {
+        endGame(false);
+        return;
+      }
+
+      update();
+    }
+
+    function update() {
+      document.getElementById('health').textContent = player.health;
+      document.getElementById('turns').textContent = player.turns;
+
+      const gridEl = document.getElementById('grid');
+      gridEl.innerHTML = '';
+
+      for (let y = 0; y < gridSize; y++) {
+        for (let x = 0; x < gridSize; x++) {
+          const tile = grid[y][x];
+          const div = document.createElement('div');
+          div.classList.add('tile');
+
+          if (x === player.x && y === player.y) {
+            div.classList.add('player');
+            div.textContent = 'You';
+          } else if (tile.revealed) {
+            div.classList.add('revealed', tile.terrain);
+            div.innerHTML = `<span class="label">${tile.terrain}</span>`;
+            div.onclick = () => moveTo(x, y);
+          }
+
+          gridEl.appendChild(div);
+        }
+      }
+    }
+
+    function endGame(win) {
+      document.getElementById('endScreen').style.display = 'flex';
+      document.getElementById('endMessage').textContent = win ?
+        'You found the artifact! Victory!' :
+        'You failed your quest...';
+    }
+
+    function initGame() {
+      player = { x: 2, y: 2, health: 5, turns: 20 };
+      createGrid();
+      revealAround(player.x, player.y);
+      placeArtifact();
+      update();
+      document.getElementById('log').innerHTML = '';
+      document.getElementById('endScreen').style.display = 'none';
+    }
+
+    initGame();
+  </script>
+</body>
+</html>
